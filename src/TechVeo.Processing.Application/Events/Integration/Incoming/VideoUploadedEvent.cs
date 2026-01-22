@@ -6,7 +6,7 @@ namespace TechVeo.Processing.Application.Events.Integration.Incoming
     public record VideoUploadedEvent(
         Guid VideoId,
         Guid UserId,
-        string VideoUrl,
+        string VideoKey,
         DateTime UploadedAt,
         VideoUploadedMetadata Metadata
         ) : IIntegrationEvent;

@@ -20,7 +20,8 @@ public class VideoProcessingService : IVideoProcessingService
 
     public async Task<IReadOnlyList<(Stream Stream, string FileName)>> ExtractSnapshotsAsync(
         Stream videoStream,
-        int snapshotCount = 5,
+        int? snapshotCount = null,
+        double? intervalSeconds = null,
         CancellationToken cancellationToken = default)
     {
         var tempVideoPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
@@ -36,14 +37,27 @@ public class VideoProcessingService : IVideoProcessingService
             }
 
             var duration = await GetVideoDurationAsync(tempVideoPath, cancellationToken);
-            var interval = duration / (snapshotCount + 1);
+
+            int finalSnapshotCount = snapshotCount ?? 5;
+            double interval;
+
+            if (intervalSeconds.HasValue && intervalSeconds.Value > 0)
+            {
+                interval = intervalSeconds.Value;
+                // compute how many snapshots will fit in the duration using the interval
+                finalSnapshotCount = Math.Max(1, (int)Math.Floor(duration / interval));
+            }
+            else
+            {
+                interval = duration / (finalSnapshotCount + 1);
+            }
 
             _logger.LogInformation("Video duration: {Duration}s, extracting {Count} snapshots with interval {Interval}s",
                 duration, snapshotCount, interval);
 
             var snapshots = new List<(Stream Stream, string FileName)>();
 
-            for (int i = 1; i <= snapshotCount; i++)
+            for (int i = 1; i <= finalSnapshotCount; i++)
             {
                 var timestamp = interval * i;
                 var fileName = $"snapshot_{i:D3}.jpg";

@@ -7,5 +7,11 @@ namespace TechVeo.Processing.Application.Services;
 
 public interface IVideoProcessingService
 {
-    Task<IReadOnlyList<(Stream Stream, string FileName)>> ExtractSnapshotsAsync(Stream videoStream, int snapshotCount = 5, CancellationToken cancellationToken = default);
+    // If 'intervalSeconds' is provided it will be used to extract snapshots at that interval (in seconds).
+    // Otherwise 'snapshotCount' (or default) will be used to compute evenly spaced snapshots across the video.
+    Task<IReadOnlyList<(Stream Stream, string FileName)>> ExtractSnapshotsAsync(
+        Stream videoStream,
+        int? snapshotCount = null,
+        double? intervalSeconds = null,
+        CancellationToken cancellationToken = default);
 }

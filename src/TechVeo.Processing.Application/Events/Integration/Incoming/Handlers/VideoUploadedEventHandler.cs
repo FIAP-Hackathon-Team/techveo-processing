@@ -30,17 +30,20 @@ internal class VideoUploadedEventHandler(
 
             try
             {
-                var videoKey = ExtractKeyFromUrl(@event.VideoUrl);
+                var videoKey = @event.VideoKey;
 
                 logger.LogInformation("Downloading video from S3 for VideoId: {VideoId}, Key: {VideoKey}", @event.VideoId, videoKey);
                 videoStream = await videoStorage.DownloadVideoAsync(videoKey, cancellationToken);
 
-                var snapshotCount = @event.Metadata.SnapshotCount ?? 5;
-                logger.LogInformation("Extracting {SnapshotCount} snapshots for VideoId: {VideoId}", snapshotCount, @event.VideoId);
+                var snapshotCount = @event.Metadata.SnapshotCount;
+                var intervalSeconds = @event.Metadata.IntervalSeconds;
+
+                logger.LogInformation("Extracting snapshots for VideoId: {VideoId} (SnapshotCount={SnapshotCount}, IntervalSeconds={IntervalSeconds})", snapshotCount, intervalSeconds, @event.VideoId);
 
                 var snapshots = await videoProcessingService.ExtractSnapshotsAsync(
                     videoStream,
                     snapshotCount,
+                    intervalSeconds,
                     cancellationToken);
 
                 await mediator.Publish(new VideoSnapshotsGenerated(
@@ -87,11 +90,5 @@ internal class VideoUploadedEventHandler(
 
             throw;
         }
-    }
-
-    private static string ExtractKeyFromUrl(string url)
-    {
-        var uri = new Uri(url);
-        return uri.AbsolutePath.TrimStart('/');
     }
 }
