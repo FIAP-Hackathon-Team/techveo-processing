@@ -44,6 +44,7 @@
 	<ItemGroup>
 	  <Folder Include="Dto\" />
 	  <Folder Include="Events\Domain\" />
+	  <Folder Include="Storage\" />
 	</ItemGroup>
 
 </Project>

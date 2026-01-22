@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using TechVeo.Processing.Application.Services;
+using TechVeo.Processing.Infra.Services;
 using TechVeo.Shared.Infra.Extensions;
 
 namespace TechVeo.Processing.Infra;
@@ -11,6 +13,8 @@ public static class DependencyInjection
         {
             ApplicationAssembly = typeof(Application.DependencyInjection).Assembly
         });
+
+        services.AddScoped<IVideoProcessingService, VideoProcessingService>();
 
         return services;
     }

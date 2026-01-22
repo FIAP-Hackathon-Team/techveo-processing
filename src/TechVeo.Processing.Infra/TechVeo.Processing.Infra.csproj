@@ -24,8 +24,4 @@
     <ProjectReference Include="..\TechVeo.Processing.Application\TechVeo.Processing.Application.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Services\" />
-  </ItemGroup>
-
 </Project>
