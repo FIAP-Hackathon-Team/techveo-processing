@@ -58,8 +58,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           ${{ runner.temp }}/scanner/dotnet-sonarscanner begin \
-            /k:"TechChallenge-Team_techveo-processing" \
-            /o:"techchallenge-team" \
+            /k:"FIAP-Hackathon-Team_techveo-processing" \
+            /o:"fiap-hackathon-team" \
             /d:sonar.token="${{ env.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.opencover.reportsPaths="${{ env.COVERAGE_PATH }}" \
@@ -76,7 +76,7 @@ jobs:
       - name: Add GitHub Packages source
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet nuget add source --username ${{ github.actor }} --password ${{ env.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/TechChallenge-Team/index.json"
+        run: dotnet nuget add source --username ${{ github.actor }} --password ${{ env.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/FIAP-Hackathon-Team/index.json"
 
       - name: Restore dependencies
         run: dotnet restore
