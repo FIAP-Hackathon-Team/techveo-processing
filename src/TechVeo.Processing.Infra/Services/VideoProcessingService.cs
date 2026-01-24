@@ -23,6 +23,8 @@ public class VideoProcessingService : IVideoProcessingService
         Stream videoStream,
         int? snapshotCount = null,
         double? intervalSeconds = null,
+        int? width = null,
+        int? height = null,
         CancellationToken cancellationToken = default)
     {
         var tempVideoPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
@@ -64,7 +66,7 @@ public class VideoProcessingService : IVideoProcessingService
                 var fileName = $"snapshot_{i:D3}.jpg";
                 var snapshotPath = Path.Combine(tempSnapshotDir, fileName);
 
-                await ExtractSnapshotAtTimestampAsync(tempVideoPath, snapshotPath, timestamp, cancellationToken);
+                await ExtractSnapshotAtTimestampAsync(tempVideoPath, snapshotPath, timestamp, width, height, cancellationToken);
 
                 var memoryStream = new MemoryStream();
                 await using (var fileStream = File.OpenRead(snapshotPath))
@@ -124,13 +126,14 @@ public class VideoProcessingService : IVideoProcessingService
         string videoPath,
         string outputPath,
         double timestamp,
+        int? width,
+        int? height,
         CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            // prevent ffmpeg from waiting for stdin and reduce log verbosity
-            Arguments = $"-nostdin -y -hide_banner -loglevel error -ss {timestamp.ToString("F2", CultureInfo.InvariantCulture)} -i \"{videoPath}\" -vframes 1 -q:v 2 \"{outputPath}\"",
+            Arguments = BuildFfmpegArguments(videoPath, outputPath, timestamp, width, height),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -172,5 +175,22 @@ public class VideoProcessingService : IVideoProcessingService
             var error = await stdErrTask;
             throw new InvalidOperationException($"Failed to extract snapshot: {error}");
         }
+    }
+
+    private static string BuildFfmpegArguments(string videoPath, string outputPath, double timestamp, int? width, int? height)
+    {
+        var ts = timestamp.ToString("F2", CultureInfo.InvariantCulture);
+
+        if (width.HasValue || height.HasValue)
+        {
+            // Build scale filter. If only one dimension provided, set the other to -1 to preserve aspect ratio.
+            var w = width.HasValue ? width.Value.ToString() : "-1";
+            var h = height.HasValue ? height.Value.ToString() : "-1";
+            var scale = $"scale={w}:{h}";
+            // Use -frames:v 1 and -q:v 2 for quality
+            return $"-nostdin -y -hide_banner -loglevel error -ss {ts} -i \"{videoPath}\" -vf \"{scale}\" -frames:v 1 -q:v 2 \"{outputPath}\"";
+        }
+
+        return $"-nostdin -y -hide_banner -loglevel error -ss {ts} -i \"{videoPath}\" -vframes 1 -q:v 2 \"{outputPath}\"";
     }
 }

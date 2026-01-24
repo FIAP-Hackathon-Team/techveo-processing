@@ -37,6 +37,8 @@ internal class VideoUploadedEventHandler(
 
                 var snapshotCount = @event.Metadata.SnapshotCount;
                 var intervalSeconds = @event.Metadata.IntervalSeconds;
+                var width = @event.Metadata.Width;
+                var height = @event.Metadata.Height;
 
                 logger.LogInformation("Extracting snapshots for VideoId: {VideoId} (SnapshotCount={SnapshotCount}, IntervalSeconds={IntervalSeconds})", snapshotCount, intervalSeconds, @event.VideoId);
 
@@ -44,6 +46,8 @@ internal class VideoUploadedEventHandler(
                     videoStream,
                     snapshotCount,
                     intervalSeconds,
+                    width,
+                    height,
                     cancellationToken);
 
                 await mediator.Publish(new VideoSnapshotsGenerated(

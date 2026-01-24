@@ -13,5 +13,7 @@ public interface IVideoProcessingService
         Stream videoStream,
         int? snapshotCount = null,
         double? intervalSeconds = null,
+        int? width = null,
+        int? height = null,
         CancellationToken cancellationToken = default);
 }
