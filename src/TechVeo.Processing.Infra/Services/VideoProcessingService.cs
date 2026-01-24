@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -116,7 +117,7 @@ public class VideoProcessingService : IVideoProcessingService
             throw new InvalidOperationException($"Failed to get video duration: {error}");
         }
 
-        return double.Parse(output.Trim());
+        return double.Parse(output.Trim(), CultureInfo.InvariantCulture);
     }
 
     private static async Task ExtractSnapshotAtTimestampAsync(
@@ -128,7 +129,8 @@ public class VideoProcessingService : IVideoProcessingService
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-ss {timestamp:F2} -i \"{videoPath}\" -vframes 1 -q:v 2 \"{outputPath}\"",
+            // prevent ffmpeg from waiting for stdin and reduce log verbosity
+            Arguments = $"-nostdin -y -hide_banner -loglevel error -ss {timestamp.ToString("F2", CultureInfo.InvariantCulture)} -i \"{videoPath}\" -vframes 1 -q:v 2 \"{outputPath}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -138,11 +140,36 @@ public class VideoProcessingService : IVideoProcessingService
         using var process = new Process { StartInfo = startInfo };
         process.Start();
 
-        await process.WaitForExitAsync(cancellationToken);
+        var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var waitTask = process.WaitForExitAsync(cancellationToken);
+
+        try
+        {
+            // Wait for process exit and stream reads to complete to avoid deadlocks when buffers fill
+            await Task.WhenAll(waitTask, stdOutTask, stdErrTask);
+        }
+        catch (OperationCanceledException)
+        {
+            // If the operation was canceled, ensure the child process is terminated to avoid orphan processes
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+                // ignore kill failures
+            }
+
+            throw;
+        }
 
         if (process.ExitCode != 0)
         {
-            var error = await process.StandardError.ReadToEndAsync(cancellationToken);
+            var error = await stdErrTask;
             throw new InvalidOperationException($"Failed to extract snapshot: {error}");
         }
     }
