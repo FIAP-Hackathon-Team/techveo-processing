@@ -95,6 +95,62 @@ public class VideoProcessingService : IVideoProcessingService
         }
     }
 
+    public async Task<IReadOnlyList<(Stream Stream, string FileName)>> ExtractSnapshotsAtTimestampsAsync(
+        Stream videoStream,
+        IReadOnlyList<double> timestamps,
+        int? width = null,
+        int? height = null,
+        CancellationToken cancellationToken = default)
+    {
+        var tempVideoPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp4");
+        var tempSnapshotDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempSnapshotDir);
+
+        try
+        {
+            _logger.LogInformation("Saving video to temporary file: {TempVideoPath}", tempVideoPath);
+            await using (var fileStream = File.Create(tempVideoPath))
+            {
+                await videoStream.CopyToAsync(fileStream, cancellationToken);
+            }
+
+            var snapshots = new List<(Stream Stream, string FileName)>();
+            int index = 1;
+            foreach (var ts in timestamps)
+            {
+                var fileName = $"snapshot_{index:D3}.jpg";
+                var snapshotPath = Path.Combine(tempSnapshotDir, fileName);
+
+                await ExtractSnapshotAtTimestampAsync(tempVideoPath, snapshotPath, ts, width, height, cancellationToken);
+
+                var memoryStream = new MemoryStream();
+                await using (var fileStream = File.OpenRead(snapshotPath))
+                {
+                    await fileStream.CopyToAsync(memoryStream, cancellationToken);
+                }
+                memoryStream.Position = 0;
+                snapshots.Add((memoryStream, fileName));
+
+                _logger.LogInformation("Snapshot {Index} extracted at {Timestamp}s", index, ts);
+                index++;
+            }
+
+            return snapshots;
+        }
+        finally
+        {
+            if (File.Exists(tempVideoPath))
+            {
+                File.Delete(tempVideoPath);
+            }
+
+            if (Directory.Exists(tempSnapshotDir))
+            {
+                Directory.Delete(tempSnapshotDir, true);
+            }
+        }
+    }
+
     private static async Task<double> GetVideoDurationAsync(string videoPath, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo

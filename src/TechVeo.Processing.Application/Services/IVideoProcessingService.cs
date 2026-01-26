@@ -16,4 +16,12 @@ public interface IVideoProcessingService
         int? width = null,
         int? height = null,
         CancellationToken cancellationToken = default);
+
+    // Extract snapshots at specific timestamps (seconds). Each timestamp will produce one snapshot in the same order.
+    Task<IReadOnlyList<(Stream Stream, string FileName)>> ExtractSnapshotsAtTimestampsAsync(
+        Stream videoStream,
+        IReadOnlyList<double> timestamps,
+        int? width = null,
+        int? height = null,
+        CancellationToken cancellationToken = default);
 }

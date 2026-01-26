@@ -15,5 +15,6 @@ namespace TechVeo.Processing.Application.Events.Integration.Incoming
         int Width,
         int Height,
         int? SnapshotCount,
-        double? IntervalSeconds);
+        double? IntervalSeconds,
+        string? AiPrompt);
 }
