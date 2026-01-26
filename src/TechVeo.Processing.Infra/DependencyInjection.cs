@@ -17,7 +17,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IVideoProcessingService, VideoProcessingService>();
-        services.AddHttpClient<IGenerativeClient, GeminiGenerativeClient>();
+        services.AddScoped<IGenerativeClient, GeminiGenerativeClient>();
 
         return services;
     }
