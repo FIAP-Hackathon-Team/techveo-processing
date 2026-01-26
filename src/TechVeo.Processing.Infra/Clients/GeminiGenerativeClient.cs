@@ -62,7 +62,7 @@ public class GeminiGenerativeClient : IGenerativeClient
             }
         };
 
-        var url = $"{BaseUrl}/{_modelId}:streamGenerateContent?key={_apiKey}";
+        var url = $"{BaseUrl}{_modelId}:streamGenerateContent?key={_apiKey}";
 
         try
         {
