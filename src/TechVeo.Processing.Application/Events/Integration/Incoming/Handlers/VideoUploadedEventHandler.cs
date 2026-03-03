@@ -4,11 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TechVeo.Processing.Application.Clients;
 using TechVeo.Processing.Application.Events.Integration.Outgoing;
 using TechVeo.Processing.Application.Services;
+using TechVeo.Shared.Application.Aws;
 using TechVeo.Shared.Application.Storage;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace TechVeo.Processing.Application.Events.Integration.Incoming.Handlers;
 
@@ -25,7 +29,7 @@ internal class VideoUploadedEventHandler(
         {
             logger.LogInformation("Starting video processing for VideoId: {VideoId}", @event.VideoId);
 
-            await mediator.Publish(new VideoProcessingStarted(
+            await mediator.Publish(new VideoProcessingStartedEvent(
                 @event.VideoId,
                 DateTime.UtcNow), cancellationToken);
 
@@ -37,7 +41,7 @@ internal class VideoUploadedEventHandler(
 
                 logger.LogInformation("Downloading video from S3 for VideoId: {VideoId}, Key: {VideoKey}", @event.VideoId, videoKey);
                 videoStream = await videoStorage.DownloadVideoAsync(videoKey, cancellationToken);
-
+                
                 var snapshotCount = @event.Metadata.SnapshotCount;
                 var intervalSeconds = @event.Metadata.IntervalSeconds;
                 var width = @event.Metadata.Width;
@@ -76,7 +80,7 @@ internal class VideoUploadedEventHandler(
                             idx++;
                         }
 
-                        await mediator.Publish(new VideoSnapshotsGenerated(
+                        await mediator.Publish(new VideoSnapshotsGeneratedEvent(
                             @event.VideoId,
                             DateTime.UtcNow), cancellationToken);
 
@@ -86,7 +90,7 @@ internal class VideoUploadedEventHandler(
                         logger.LogInformation("Uploading zip file to S3 for VideoId: {VideoId}, ZipId: {ZipId}", @event.VideoId, zipId);
                         var zipUrl = await videoStorage.UploadSnapshotsAsZipAsync(snapshots, zipFileName, cancellationToken);
 
-                        await mediator.Publish(new VideoZipGenerated(
+                        await mediator.Publish(new VideoZipGeneratedEvent(
                             @event.VideoId,
                             zipId,
                             zipUrl), cancellationToken);
@@ -120,7 +124,7 @@ internal class VideoUploadedEventHandler(
                     height,
                     cancellationToken);
 
-                await mediator.Publish(new VideoSnapshotsGenerated(
+                await mediator.Publish(new VideoSnapshotsGeneratedEvent(
                     @event.VideoId,
                     DateTime.UtcNow), cancellationToken);
 
@@ -130,7 +134,7 @@ internal class VideoUploadedEventHandler(
                 logger.LogInformation("Uploading zip file to S3 for VideoId: {VideoId}, ZipId: {ZipId}", @event.VideoId, defaultZipId);
                 var defaultZipUrl = await videoStorage.UploadSnapshotsAsZipAsync(defaultSnapshots, defaultZipFileName, cancellationToken);
 
-                await mediator.Publish(new VideoZipGenerated(
+                await mediator.Publish(new VideoZipGeneratedEvent(
                     @event.VideoId,
                     defaultZipId,
                     defaultZipUrl), cancellationToken);
