@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8</TargetFramework>
@@ -10,7 +10,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="TechVeo.Shared.Application" Version="2.0.8-rc" />
+    <PackageReference Include="TechVeo.Shared.Application" Version="2.0.9-rc" />
   </ItemGroup>
 
   <ItemGroup>

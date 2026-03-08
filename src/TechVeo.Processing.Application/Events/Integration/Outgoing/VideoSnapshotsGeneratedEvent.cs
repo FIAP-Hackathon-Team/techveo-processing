@@ -5,6 +5,7 @@ namespace TechVeo.Processing.Application.Events.Integration.Outgoing
 {
     public record VideoSnapshotsGeneratedEvent(
         Guid VideoId,
-        DateTime GeneratedAt
+        DateTime GeneratedAt,
+        string Url
         ) : IIntegrationEvent;
 }
