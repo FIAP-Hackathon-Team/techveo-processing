@@ -76,29 +76,20 @@ internal class VideoUploadedEventHandler(
                             idx++;
                         }
 
+                        await mediator.Publish(new VideoSnapshotsGeneratedEvent(
+                            @event.VideoId,
+                            DateTime.UtcNow), cancellationToken);
+
                         var zipId = Guid.NewGuid();
                         var zipFileName = $"snapshots_{@event.VideoId}_{zipId}.zip";
 
                         logger.LogInformation("Uploading zip file to S3 for VideoId: {VideoId}, ZipId: {ZipId}", @event.VideoId, zipId);
+
                         var zipKey = await videoStorage.UploadSnapshotsAsZipAsync(snapshots, zipFileName, cancellationToken);
-
-                        var zipUrl = await videoStorage.GetVideoDownloadUrlAsync(zipKey, TimeSpan.FromHours(24), cancellationToken);
-
-                        await mediator.Publish(new VideoSnapshotsGeneratedEvent(
-                            @event.VideoId,
-                            DateTime.UtcNow,
-                            zipUrl), cancellationToken);
 
                         await mediator.Publish(new VideoZipGeneratedEvent(
                             @event.VideoId,
-                            zipId,
-                            zipUrl), cancellationToken);
-
-                        await mediator.Publish(new VideoProcessingCompletedEvent(
-                            @event.VideoId,
-                            DateTime.UtcNow,
-                            zipUrl
-                            ), cancellationToken);
+                            zipKey), cancellationToken);
 
                         logger.LogInformation("Video processing completed successfully for VideoId: {VideoId}", @event.VideoId);
 
@@ -106,6 +97,11 @@ internal class VideoUploadedEventHandler(
                         {
                             await stream.DisposeAsync();
                         }
+
+                        await mediator.Publish(new VideoProcessingCompletedEvent(
+                            @event.VideoId,
+                            DateTime.UtcNow,
+                            zipKey), cancellationToken);
 
                         return;
                     }
@@ -125,30 +121,20 @@ internal class VideoUploadedEventHandler(
                     height,
                     cancellationToken);
 
+                await mediator.Publish(new VideoSnapshotsGeneratedEvent(
+                    @event.VideoId,
+                    DateTime.UtcNow), cancellationToken);
+
                 var defaultZipId = Guid.NewGuid();
                 var defaultZipFileName = $"snapshots_{@event.VideoId}_{defaultZipId}.zip";
 
                 logger.LogInformation("Uploading zip file to S3 for VideoId: {VideoId}, ZipId: {ZipId}", @event.VideoId, defaultZipId);
+
                 var defaultZipKey = await videoStorage.UploadSnapshotsAsZipAsync(defaultSnapshots, defaultZipFileName, cancellationToken);
-
-                var defaultZipUrl = await videoStorage.GetVideoDownloadUrlAsync(defaultZipKey, TimeSpan.FromHours(24), cancellationToken);
-
-                await mediator.Publish(new VideoSnapshotsGeneratedEvent(
-                @event.VideoId,
-                DateTime.UtcNow,
-                defaultZipUrl
-                ), cancellationToken);
 
                 await mediator.Publish(new VideoZipGeneratedEvent(
                     @event.VideoId,
-                    defaultZipId,
-                    defaultZipUrl), cancellationToken);
-
-                await mediator.Publish(new VideoProcessingCompletedEvent(
-                    @event.VideoId,
-                    DateTime.UtcNow,
-                    defaultZipUrl
-                    ), cancellationToken);
+                    defaultZipKey), cancellationToken);
 
                 logger.LogInformation("Video processing completed successfully for VideoId: {VideoId}", @event.VideoId);
 
@@ -156,6 +142,11 @@ internal class VideoUploadedEventHandler(
                 {
                     await stream.DisposeAsync();
                 }
+
+                await mediator.Publish(new VideoProcessingCompletedEvent(
+                    @event.VideoId,
+                    DateTime.UtcNow,
+                    defaultZipKey), cancellationToken);
             }
             finally
             {

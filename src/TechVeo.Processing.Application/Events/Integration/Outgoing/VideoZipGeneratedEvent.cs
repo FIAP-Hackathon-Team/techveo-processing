@@ -5,7 +5,6 @@ namespace TechVeo.Processing.Application.Events.Integration.Outgoing
 {
     public record VideoZipGeneratedEvent(
         Guid VideoId,
-        Guid ZipId,
-        string ZipUrl
+        string ZipKey
         ) : IIntegrationEvent;
 }
