@@ -3,8 +3,8 @@ using TechVeo.Shared.Application.Events;
 
 namespace TechVeo.Processing.Application.Events.Integration.Outgoing
 {
-    public record VideoSnapshotsGenerated(
+    public record VideoProcessingStartedEvent(
         Guid VideoId,
-        DateTime GeneratedAt
+        DateTime StartedAt
         ) : IIntegrationEvent;
 }

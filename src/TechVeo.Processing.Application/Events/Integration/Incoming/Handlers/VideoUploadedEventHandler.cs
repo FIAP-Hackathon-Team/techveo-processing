@@ -25,7 +25,7 @@ internal class VideoUploadedEventHandler(
         {
             logger.LogInformation("Starting video processing for VideoId: {VideoId}", @event.VideoId);
 
-            await mediator.Publish(new VideoProcessingStarted(
+            await mediator.Publish(new VideoProcessingStartedEvent(
                 @event.VideoId,
                 DateTime.UtcNow), cancellationToken);
 
@@ -76,24 +76,29 @@ internal class VideoUploadedEventHandler(
                             idx++;
                         }
 
-                        await mediator.Publish(new VideoSnapshotsGenerated(
-                            @event.VideoId,
-                            DateTime.UtcNow), cancellationToken);
-
                         var zipId = Guid.NewGuid();
                         var zipFileName = $"snapshots_{@event.VideoId}_{zipId}.zip";
 
                         logger.LogInformation("Uploading zip file to S3 for VideoId: {VideoId}, ZipId: {ZipId}", @event.VideoId, zipId);
-                        var zipUrl = await videoStorage.UploadSnapshotsAsZipAsync(snapshots, zipFileName, cancellationToken);
+                        var zipKey = await videoStorage.UploadSnapshotsAsZipAsync(snapshots, zipFileName, cancellationToken);
 
-                        await mediator.Publish(new VideoZipGenerated(
+                        var zipUrl = await videoStorage.GetVideoDownloadUrlAsync(zipKey, TimeSpan.FromHours(24), cancellationToken);
+
+                        await mediator.Publish(new VideoSnapshotsGeneratedEvent(
+                            @event.VideoId,
+                            DateTime.UtcNow,
+                            zipUrl), cancellationToken);
+
+                        await mediator.Publish(new VideoZipGeneratedEvent(
                             @event.VideoId,
                             zipId,
                             zipUrl), cancellationToken);
 
                         await mediator.Publish(new VideoProcessingCompletedEvent(
                             @event.VideoId,
-                            DateTime.UtcNow), cancellationToken);
+                            DateTime.UtcNow,
+                            zipUrl
+                            ), cancellationToken);
 
                         logger.LogInformation("Video processing completed successfully for VideoId: {VideoId}", @event.VideoId);
 
@@ -120,24 +125,30 @@ internal class VideoUploadedEventHandler(
                     height,
                     cancellationToken);
 
-                await mediator.Publish(new VideoSnapshotsGenerated(
-                    @event.VideoId,
-                    DateTime.UtcNow), cancellationToken);
-
                 var defaultZipId = Guid.NewGuid();
                 var defaultZipFileName = $"snapshots_{@event.VideoId}_{defaultZipId}.zip";
 
                 logger.LogInformation("Uploading zip file to S3 for VideoId: {VideoId}, ZipId: {ZipId}", @event.VideoId, defaultZipId);
-                var defaultZipUrl = await videoStorage.UploadSnapshotsAsZipAsync(defaultSnapshots, defaultZipFileName, cancellationToken);
+                var defaultZipKey = await videoStorage.UploadSnapshotsAsZipAsync(defaultSnapshots, defaultZipFileName, cancellationToken);
 
-                await mediator.Publish(new VideoZipGenerated(
+                var defaultZipUrl = await videoStorage.GetVideoDownloadUrlAsync(defaultZipKey, TimeSpan.FromHours(24), cancellationToken);
+
+                await mediator.Publish(new VideoSnapshotsGeneratedEvent(
+                @event.VideoId,
+                DateTime.UtcNow,
+                defaultZipUrl
+                ), cancellationToken);
+
+                await mediator.Publish(new VideoZipGeneratedEvent(
                     @event.VideoId,
                     defaultZipId,
                     defaultZipUrl), cancellationToken);
 
                 await mediator.Publish(new VideoProcessingCompletedEvent(
                     @event.VideoId,
-                    DateTime.UtcNow), cancellationToken);
+                    DateTime.UtcNow,
+                    defaultZipUrl
+                    ), cancellationToken);
 
                 logger.LogInformation("Video processing completed successfully for VideoId: {VideoId}", @event.VideoId);
 
@@ -162,7 +173,7 @@ internal class VideoUploadedEventHandler(
                 @event.VideoId,
                 DateTime.UtcNow), cancellationToken);
 
-            throw;
+            return;
         }
     }
 }

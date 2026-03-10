@@ -126,7 +126,7 @@ jobs:
           docker build \
             -t ${{ vars.DOCKERHUB_USERNAME }}/techveo-processing-worker:latest \
             -t ${{ vars.DOCKERHUB_USERNAME }}/techveo-processing-worker:${{ github.sha }} \
-            -f src/TechFood.Processing.Worker/Dockerfile \
+            -f src/TechVeo.Processing.Worker/Dockerfile \
             --build-arg GITHUB_TOKEN=${{ env.GITHUB_TOKEN }} \
             --build-arg GITHUB_ACTOR=${{ github.actor }} \
             .

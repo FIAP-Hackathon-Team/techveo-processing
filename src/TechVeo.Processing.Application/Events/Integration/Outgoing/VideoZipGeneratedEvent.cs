@@ -3,7 +3,7 @@ using TechVeo.Shared.Application.Events;
 
 namespace TechVeo.Processing.Application.Events.Integration.Outgoing
 {
-    public record VideoZipGenerated(
+    public record VideoZipGeneratedEvent(
         Guid VideoId,
         Guid ZipId,
         string ZipUrl
