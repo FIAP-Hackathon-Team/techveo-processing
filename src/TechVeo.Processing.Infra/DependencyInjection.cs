@@ -16,6 +16,7 @@ public static class DependencyInjection
             ApplicationAssembly = typeof(Application.DependencyInjection).Assembly
         });
 
+        services.AddScoped<IProcessRunner, DefaultProcessRunner>();
         services.AddScoped<IVideoProcessingService, VideoProcessingService>();
         services.AddScoped<IGenerativeClient, GeminiGenerativeClient>();
 
