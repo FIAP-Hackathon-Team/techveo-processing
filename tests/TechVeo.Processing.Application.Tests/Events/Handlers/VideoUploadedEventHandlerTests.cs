@@ -146,6 +146,121 @@ public class VideoUploadedEventHandlerTests
             Times.Once);
     }
 
+    [Fact(DisplayName = "Should handle zip upload failure")]
+    [Trait("Application", "VideoUploadedEventHandler")]
+    public async Task Handle_WithZipUploadFailure_ShouldPublishFailedEvent()
+    {
+        // Arrange
+        var uploadEvent = CreateVideoUploadedEvent();
+        var videoStream = CreateMockVideoStream();
+
+        _videoStorageMock
+            .Setup(x => x.DownloadVideoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(videoStream);
+
+        _videoProcessingServiceMock
+            .Setup(x => x.ExtractSnapshotsAsync(It.IsAny<Stream>(), It.IsAny<int?>(), It.IsAny<double?>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateMockSnapshots(3));
+
+        _videoStorageMock
+            .Setup(x => x.UploadSnapshotsAsZipAsync(It.IsAny<IReadOnlyList<(Stream, string)>>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("S3 upload failed"));
+
+        _mediatorMock
+            .Setup(x => x.Publish(It.IsAny<INotification>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _handler.Handle(uploadEvent, CancellationToken.None);
+
+        // Assert
+        _mediatorMock.Verify(
+            x => x.Publish(It.IsAny<VideoProcessingFailedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact(DisplayName = "Should call upload with filename containing VideoId")]
+    [Trait("Application", "VideoUploadedEventHandler")]
+    public async Task Handle_ShouldCallUploadWithVideoIdInFilename()
+    {
+        // Arrange
+        var videoId = Guid.NewGuid();
+        var uploadEvent = new VideoUploadedEvent(
+            videoId,
+            Guid.NewGuid(),
+            "videos/test.mp4",
+            DateTime.UtcNow,
+            new VideoUploadedMetadata(1920, 1080, 5, null, null));
+
+        _videoStorageMock
+            .Setup(x => x.DownloadVideoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateMockVideoStream());
+
+        _videoProcessingServiceMock
+            .Setup(x => x.ExtractSnapshotsAsync(It.IsAny<Stream>(), It.IsAny<int?>(), It.IsAny<double?>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateMockSnapshots(1));
+
+        _videoStorageMock
+            .Setup(x => x.UploadSnapshotsAsZipAsync(It.IsAny<IReadOnlyList<(Stream, string)>>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("snapshots/result.zip");
+
+        _mediatorMock
+            .Setup(x => x.Publish(It.IsAny<INotification>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _handler.Handle(uploadEvent, CancellationToken.None);
+
+        // Assert - zip file name must contain the VideoId
+        _videoStorageMock.Verify(
+            x => x.UploadSnapshotsAsZipAsync(
+                It.IsAny<IReadOnlyList<(Stream, string)>>(),
+                It.Is<string>(name => name.Contains(videoId.ToString())),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact(DisplayName = "Should publish completed event with zip key from upload")]
+    [Trait("Application", "VideoUploadedEventHandler")]
+    public async Task Handle_ShouldPublishCompletedEventWithCorrectZipKey()
+    {
+        // Arrange
+        var uploadEvent = CreateVideoUploadedEvent();
+        var expectedZipKey = "snapshots/specific-key.zip";
+
+        _videoStorageMock
+            .Setup(x => x.DownloadVideoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateMockVideoStream());
+
+        _videoProcessingServiceMock
+            .Setup(x => x.ExtractSnapshotsAsync(It.IsAny<Stream>(), It.IsAny<int?>(), It.IsAny<double?>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateMockSnapshots(1));
+
+        _videoStorageMock
+            .Setup(x => x.UploadSnapshotsAsZipAsync(It.IsAny<IReadOnlyList<(Stream, string)>>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedZipKey);
+
+        _mediatorMock
+            .Setup(x => x.Publish(It.IsAny<INotification>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _handler.Handle(uploadEvent, CancellationToken.None);
+
+        // Assert - VideoProcessingCompletedEvent must carry the zip key returned by upload
+        _mediatorMock.Verify(
+            x => x.Publish(
+                It.Is<VideoProcessingCompletedEvent>(e => e.ZipKey == expectedZipKey),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private VideoUploadedEvent CreateVideoUploadedEvent()
     {
         return new VideoUploadedEvent(
