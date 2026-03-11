@@ -1,7 +1,6 @@
 using System;
-using System.Globalization;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,10 +12,12 @@ namespace TechVeo.Processing.Infra.Services;
 public class VideoProcessingService : IVideoProcessingService
 {
     private readonly ILogger<VideoProcessingService> _logger;
+    private readonly IProcessRunner _processRunner;
 
-    public VideoProcessingService(ILogger<VideoProcessingService> logger)
+    public VideoProcessingService(ILogger<VideoProcessingService> logger, IProcessRunner processRunner)
     {
         _logger = logger;
+        _processRunner = processRunner;
     }
 
     public async Task<IReadOnlyList<(Stream Stream, string FileName)>> ExtractSnapshotsAsync(
@@ -47,7 +48,6 @@ public class VideoProcessingService : IVideoProcessingService
             if (intervalSeconds.HasValue && intervalSeconds.Value > 0)
             {
                 interval = intervalSeconds.Value;
-                // compute how many snapshots will fit in the duration using the interval
                 finalSnapshotCount = Math.Max(1, (int)Math.Floor(duration / interval));
             }
             else
@@ -84,14 +84,10 @@ public class VideoProcessingService : IVideoProcessingService
         finally
         {
             if (File.Exists(tempVideoPath))
-            {
                 File.Delete(tempVideoPath);
-            }
 
             if (Directory.Exists(tempSnapshotDir))
-            {
                 Directory.Delete(tempSnapshotDir, true);
-            }
         }
     }
 
@@ -140,45 +136,25 @@ public class VideoProcessingService : IVideoProcessingService
         finally
         {
             if (File.Exists(tempVideoPath))
-            {
                 File.Delete(tempVideoPath);
-            }
 
             if (Directory.Exists(tempSnapshotDir))
-            {
                 Directory.Delete(tempSnapshotDir, true);
-            }
         }
     }
 
-    private static async Task<double> GetVideoDurationAsync(string videoPath, CancellationToken cancellationToken)
+    private async Task<double> GetVideoDurationAsync(string videoPath, CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "ffprobe",
-            Arguments = $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{videoPath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var args = $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{videoPath}\"";
+        var result = await _processRunner.RunAsync("ffprobe", args, cancellationToken);
 
-        using var process = new Process { StartInfo = startInfo };
-        process.Start();
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"Failed to get video duration: {result.StdErr}");
 
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-
-        if (process.ExitCode != 0)
-        {
-            var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-            throw new InvalidOperationException($"Failed to get video duration: {error}");
-        }
-
-        return double.Parse(output.Trim(), CultureInfo.InvariantCulture);
+        return double.Parse(result.StdOut.Trim(), CultureInfo.InvariantCulture);
     }
 
-    private static async Task ExtractSnapshotAtTimestampAsync(
+    private async Task ExtractSnapshotAtTimestampAsync(
         string videoPath,
         string outputPath,
         double timestamp,
@@ -186,64 +162,22 @@ public class VideoProcessingService : IVideoProcessingService
         int? height,
         CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "ffmpeg",
-            Arguments = BuildFfmpegArguments(videoPath, outputPath, timestamp, width, height),
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var args = BuildFfmpegArguments(videoPath, outputPath, timestamp, width, height);
+        var result = await _processRunner.RunAsync("ffmpeg", args, cancellationToken);
 
-        using var process = new Process { StartInfo = startInfo };
-        process.Start();
-
-        var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        var waitTask = process.WaitForExitAsync(cancellationToken);
-
-        try
-        {
-            // Wait for process exit and stream reads to complete to avoid deadlocks when buffers fill
-            await Task.WhenAll(waitTask, stdOutTask, stdErrTask);
-        }
-        catch (OperationCanceledException)
-        {
-            // If the operation was canceled, ensure the child process is terminated to avoid orphan processes
-            try
-            {
-                if (!process.HasExited)
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-            }
-            catch
-            {
-                // ignore kill failures
-            }
-
-            throw;
-        }
-
-        if (process.ExitCode != 0)
-        {
-            var error = await stdErrTask;
-            throw new InvalidOperationException($"Failed to extract snapshot: {error}");
-        }
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"Failed to extract snapshot: {result.StdErr}");
     }
 
-    private static string BuildFfmpegArguments(string videoPath, string outputPath, double timestamp, int? width, int? height)
+    internal static string BuildFfmpegArguments(string videoPath, string outputPath, double timestamp, int? width, int? height)
     {
         var ts = timestamp.ToString("F2", CultureInfo.InvariantCulture);
 
         if (width.HasValue || height.HasValue)
         {
-            // Build scale filter. If only one dimension provided, set the other to -1 to preserve aspect ratio.
             var w = width.HasValue ? width.Value.ToString() : "-1";
             var h = height.HasValue ? height.Value.ToString() : "-1";
             var scale = $"scale={w}:{h}";
-            // Use -frames:v 1 and -q:v 2 for quality
             return $"-nostdin -y -hide_banner -loglevel error -ss {ts} -i \"{videoPath}\" -vf \"{scale}\" -frames:v 1 -q:v 2 \"{outputPath}\"";
         }
 
