@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="TechVeo.Shared.Worker" Version="2.0.9-rc" />
+    <PackageReference Include="TechVeo.Shared.Worker" Version="2.0.10-rc" />
   </ItemGroup>
 
   <ItemGroup>
